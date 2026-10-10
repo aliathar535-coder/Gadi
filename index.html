@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gadi Hisab Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #eef2f5; margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 500px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a252f; margin-top: 0; }
+        .cards { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 15px; }
+        .card { flex: 1; padding: 10px; border-radius: 8px; color: #fff; text-align: center; }
+        .card.income { background-color: #27ae60; }
+        .card.expense { background-color: #e74c3c; }
+        .card.profit { background-color: #2980b9; }
+        .card h3 { margin: 0 0 5px 0; font-size: 11px; text-transform: uppercase; }
+        .card p { margin: 0; font-size: 16px; font-weight: bold; }
+        form { display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e1e8ed; }
+        input, select, button { padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { background-color: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .pdf-btn { background-color: #8e44ad; width: 100%; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
+        th { background-color: #2c3e50; color: white; }
+        .delete-btn { background-color: #c0392b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="report">
+    <h2>🚗 Gadi Hisab-Kitab</h2>
+
+    <div class="cards">
+        <div class="card income">
+            <h3>Income</h3>
+            <p id="totalIncome">₹0</p>
+        </div>
+        <div class="card expense">
+            <h3>Kharcha</h3>
+            <p id="totalExpense">₹0</p>
+        </div>
+        <div class="card profit">
+            <h3>Net Profit</h3>
+            <p id="netProfit">₹0</p>
+        </div>
+    </div>
+
+    <form id="entryForm">
+        <input type="date" id="date" required>
+        <select id="category" required>
+            <option value="">-- Category Chunein --</option>
+            <option value="Income">Aamdani (Income)</option>
+            <option value="Diesel/Petrol">Diesel / Petrol (Tel)</option>
+            <option value="Driver Salary">Driver Pagar (Salary)</option>
+            <option value="Service/Repair">Service & Maintenance</option>
+            <option value="Other">Anya Kharcha (Other)</option>
+        </select>
+        <input type="number" id="amount" placeholder="Amount (₹)" required>
+        <input type="text" id="note" placeholder="Note (Jaise: Sawari, Oil Change)">
+        <button type="submit">Entry Save Karein</button>
+    </form>
+
+    <button class="pdf-btn" onclick="downloadPDF()">📄 Download PDF Report</button>
+
+    <h3>Pichhla Hisab</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Tarikh</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Note</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="transactionList"></tbody>
+    </table>
+</div>
+
+<script>
+    let transactions = JSON.parse(localStorage.getItem('gadiData')) || [];
+
+    const form = document.getElementById('entryForm');
+    const transactionList = document.getElementById('transactionList');
+    const totalIncomeEl = document.getElementById('totalIncome');
+    const totalExpenseEl = document.getElementById('totalExpense');
+    const netProfitEl = document.getElementById('netProfit');
+
+    document.getElementById('date').valueAsDate = new Date();
+
+    function updateUI() {
+        transactionList.innerHTML = '';
+        let totalIncome = 0;
+        let totalExpense = 0;
+
+        transactions.forEach((t, index) => {
+            if (t.category === 'Income') {
+                totalIncome += Number(t.amount);
+            } else {
+                totalExpense += Number(t.amount);
+            }
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${t.date}</td>
+                <td>${t.category}</td>
+                <td style="color: ${t.category === 'Income' ? 'green' : 'red'}; font-weight: bold;">
+                    ${t.category === 'Income' ? '+' : '-'}₹${t.amount}
+                </td>
+                <td>${t.note || '-'}</td>
+                <td><button class="delete-btn" onclick="deleteTransaction(${index})">Hatao</button></td>
+            `;
+            transactionList.appendChild(row);
+        });
+
+        let netProfit = totalIncome - totalExpense;
+
+        totalIncomeEl.innerText = `₹${totalIncome}`;
+        totalExpenseEl.innerText = `₹${totalExpense}`;
+        netProfitEl.innerText = `₹${netProfit}`;
+
+        localStorage.setItem('gadiData', JSON.stringify(transactions));
+    }
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const date = document.getElementById('date').value;
+        const category = document.getElementById('category').value;
+        const amount = document.getElementById('amount').value;
+        const note = document.getElementById('note').value;
+
+        transactions.push({ date, category, amount, note });
+        form.reset();
+        document.getElementById('date').valueAsDate = new Date();
+        updateUI();
+    });
+
+    function deleteTransaction(index) {
+        transactions.splice(index, 1);
+        updateUI();
+    }
+
+    function downloadPDF() {
+        const element = document.getElementById('report');
+        html2pdf().from(element).save('Gadi_Hisab_Report.pdf');
+    }
+
+    updateUI();
+</script>
+
+</body>
+</html>
